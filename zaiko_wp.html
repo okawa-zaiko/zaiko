@@ -1,751 +1,181 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <!-- スマートフォン・タブレット表示に必須 -->
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-
-  <!-- =====================================================================
-    ▼▼▼ ページタイトル ▼▼▼
-    ブラウザのタブに表示される名前です。自由に変更してください。
-  ====================================================================== -->
-  <title>大川家具 国内オリジナル 在庫表</title>
-
-  <!-- =====================================================================
-    外部ライブラリの読み込み（インターネット接続が必要）
-    DataTables：テーブルのソート・検索・ページネーション機能
-    jQuery    ：DataTablesが内部で使用するJavaScriptライブラリ
-    ※ バージョン番号（1.13.7 / 3.7.1）は変更しないでください。
-  ====================================================================== -->
-  <link  rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
-  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-  <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
-
-  <style>
-    /* 全要素のボックスモデルを統一（通常は変更不要） */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    /* =====================================================================
-      ▼▼▼ ページ全体の基本スタイル ▼▼▼
-    ====================================================================== */
-    body {
-      /* フォント：左から優先順に適用。Meiryo がなければ Yu Gothic を使用 */
-      font-family: "Meiryo", "Yu Gothic", "メイリオ", sans-serif;
-
-      /* ページ全体の基本文字サイズ（単位:px） */
-      font-size: 13px;
-
-      /* ページの背景色（テーブル外の余白部分の色） */
-      background: #f4f7f9;
-
-      /* ページ全体の文字色 */
-      color: #334155;
-
-      /* 縦スクロールバーを常に表示（ページ幅のガタつきを防ぐ） */
-      overflow-y: scroll;
-    }
-
-    /* =====================================================================
-      ▼▼▼ 上部の青いページヘッダー ▼▼▼
-    ====================================================================== */
-    #header {
-      /* ヘッダーの背景色 */
-      background: #4A90E2;
-
-      /* ヘッダーの文字色 */
-      color: #ffffff;
-
-      /* ヘッダーの内側余白（上下 左右）*/
-      padding: 12px 24px;
-
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-
-      /* 画面上部に固定（スクロールしてもヘッダーが常に表示される） */
-      position: sticky;
-      top: 0;
-      z-index: 100;
-
-      /* ヘッダー下の影（0を大きくすると影が濃くなる） */
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-
-    /* ヘッダー左側の会社名・タイトル文字 */
-    #header h1 {
-      font-size: 18px;       /* タイトルの文字サイズ */
-      font-weight: bold;
-      letter-spacing: .05em; /* 文字間隔（大きくすると広がる） */
-      margin: 0;
-    }
-
-    /* ヘッダー右側エリア（最終更新・タイマー） */
-    #header-right { display: flex; align-items: center; gap: 20px; font-size: 13px; color: #e0f2fe; }
-
-    /* ─── 自動更新カウントダウンタイマー（円形アニメーション） ─── */
-    #reload-timer { display: flex; align-items: center; gap: 6px; }
-    #timer-ring   { width: 24px; height: 24px; transform: rotate(-90deg); }
-
-    /* タイマー円の背景（薄い円） */
-    #timer-track  { fill: none; stroke: rgba(255,255,255,0.3); stroke-width: 3; }
-
-    /* タイマー円の進行部分（白い円弧） */
-    #timer-fill   {
-      fill: none;
-      stroke: #ffffff;        /* 円弧の色。変更可能 */
-      stroke-width: 3;
-      stroke-dasharray: 57;   /* 円周の長さ（変更不要） */
-      stroke-dashoffset: 0;
-      transition: stroke-dashoffset 1s linear;
-    }
-
-    /* タイマーの残り秒数テキスト */
-    #timer-label  { font-size: 12px; color: #ffffff; min-width: 28px; text-align: right; font-weight: bold; }
-
-    /* 最終更新日時のテキスト色 */
-    #last-update  { font-size: 12px; color: #e0f2fe; }
-
-    /* =====================================================================
-      ▼▼▼ テーブル全体を囲むラッパー ▼▼▼
-      padding = ページヘッダーとテーブルの間の余白（上下 左右）
-      左右を小さくするとテーブルが画面いっぱいに広がる
-    ====================================================================== */
-    #wrapper { padding: 16px 8px; }
-
-    /* =====================================================================
-      ▼▼▼ 件数セレクタ＋検索窓のコンテナ ▼▼▼
-      テーブル上部のコントロールエリアのレイアウト設定
-    ====================================================================== */
-    .top-controls {
-      display: flex;
-      align-items: center;
-      position: relative;
-      margin-bottom: 12px; /* コントロールとテーブルの間隔 */
-      width: 100%;
-    }
-
-    /* 件数セレクタ（左端に配置） */
-    #zaiko-table_wrapper .dataTables_length { float: none; margin: 0; }
-
-    /* 検索窓（中央に配置） */
-    #zaiko-table_wrapper .dataTables_filter {
-      float: none;
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
-      margin: 0;
-      text-align: center;
-    }
-
-    /* ─── 検索窓のスタイル ─── */
-    #zaiko-table_wrapper .dataTables_filter input {
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      padding: 6px 12px;
-      font-size: 13px;
-      width: 260px; /* 検索窓の横幅 */
-      outline: none;
-      transition: border-color 0.2s;
-    }
-    /* 検索窓にフォーカスしたときの枠色 */
-    #zaiko-table_wrapper .dataTables_filter input:focus {
-      border-color: #4A90E2;
-      box-shadow: 0 0 0 2px rgba(74,144,226,0.2);
-    }
-    #zaiko-table_wrapper .dataTables_filter label { font-size: 13px; font-weight: bold; color: #475569; }
-
-    /* 件数セレクタのドロップダウン */
-    #zaiko-table_wrapper .dataTables_length select {
-      border: 1px solid #cbd5e1; border-radius: 6px; padding: 4px 8px; outline: none;
-    }
-
-    /* テーブル下部の「〇件中〇件表示」テキスト */
-    #zaiko-table_wrapper .dataTables_info { font-size: 13px; color: #64748b; margin-top: 8px; }
-
-    /* =====================================================================
-      ▼▼▼ テーブル専用スクロールコンテナ ▼▼▼
-      このdivがテーブルの縦・横スクロールを担当します。
-      ・max-height の calc() 内の数値を変えると表示できる行数が変わります
-        → 数値を小さくすると表示エリアが狭くなる（より少ない行が見える）
-        → 数値を大きくすると表示エリアが広くなる（より多い行が見える）
-    ====================================================================== */
-    div.table-container {
-      overflow-x: auto; /* 横スクロールを有効化 */
-      overflow-y: auto; /* 縦スクロールを有効化 */
-
-      /* テーブルエリアの最大高さ。ページヘッダー＋コントロール分を引いた値 */
-      max-height: calc(100vh - 165px); /* ← ここの数値を調整（大きくすると表示行数が増える） */
-
-      background: #ffffff;
-      border-radius: 8px; /* 角の丸み（0にすると直角） */
-
-      /* コンテナの影 */
-      box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-    }
-
-    /* 見出し行をコンテナ上端に固定（Excelのウィンドウ枠固定と同じ効果） */
-    div.table-container table#zaiko-table thead {
-      position: sticky;
-      top: 0;      /* コンテナの天井に固定 */
-      z-index: 50; /* 他の要素より手前に表示 */
-    }
-
-    /* =====================================================================
-      ▼▼▼ テーブルのセル共通スタイル（見出し行・データ行） ▼▼▼
-    ====================================================================== */
-    table#zaiko-table {
-      table-layout: fixed; /* 列幅を固定（見出しとデータの列位置が一致する） */
-      border-collapse: separate;
-      border-spacing: 0;
-      margin: 0;
-      width: 100% !important;
-    }
-
-    table#zaiko-table thead th,
-    table#zaiko-table tbody td {
-      box-sizing: border-box;
-      padding: 9px 10px;    /* セルの内側余白（上下 左右）。大きくすると行間が広がる */
-      white-space: nowrap;  /* テキストを折り返さない */
-      overflow: hidden;
-      text-overflow: ellipsis; /* 幅を超えたテキストは「...」で省略 */
-      vertical-align: middle;
-    }
-
-    /* =====================================================================
-      ▼▼▼ 見出し行（ヘッダー）のスタイル ▼▼▼
-    ====================================================================== */
-    table#zaiko-table thead th {
-      font-size: 12px;       /* 見出し文字サイズ */
-      font-weight: bold;
-      text-align: center !important; /* 見出しを中央揃え */
-
-      /* 見出しセルの右側の縦線の色 */
-      border-right: 1px solid #e2e8f0;
-
-      /* 見出しとデータ行の間の横線（太さ・色） */
-      border-bottom: 2px solid #cbd5e1;
-
-      cursor: pointer; /* マウスオーバーでカーソルを指マークに */
-    }
-
-    /* =====================================================================
-      ▼▼▼ データ行のスタイル ▼▼▼
-    ====================================================================== */
-    table#zaiko-table tbody td {
-      /* データセルの右側の縦線 */
-      border-right: 1px solid #f1f5f9;
-      /* データセルの下側の横線 */
-      border-bottom: 1px solid #f1f5f9;
-    }
-
-    /* 各列の最終列は右側の線を非表示 */
-    table#zaiko-table thead th:last-child,
-    table#zaiko-table tbody td:last-child { border-right: none; }
-
-    /* マウスを乗せた行の背景色（ホバー） */
-    table#zaiko-table tbody tr:hover td { background: #f8fafc !important; }
-
-    /* DataTablesのソートアイコン（▲▼）のための余白調整（変更不要） */
-    table.dataTable thead th.sorting,
-    table.dataTable thead th.sorting_asc,
-    table.dataTable thead th.sorting_desc { padding-right: 22px !important; }
-
-    /* =====================================================================
-      ▼▼▼ 見出し行の期間ごとの背景色・文字色 ▼▼▼
-      各クラスは <thead> の <th class="th-○○"> に対応します。
-      background = 背景色  /  color = 文字色
-      色はカラーコード（#RRGGBB）で指定します。
-        例）#ffffff = 白、#000000 = 黒、#ff0000 = 赤
-    ====================================================================== */
-    /* 状態・MA・商品名 の見出し */
-    .th-base  { background: #f8fafc !important; color: #334155 !important; }
-
-    /* ①現在受注可能数 の見出し（緑系） */
-    .th-now   { background: #dcfce7 !important; color: #166534 !important; }
-
-    /* ②次回（入荷日・入荷数・受注可能数）の見出し（青系） */
-    .th-next1 { background: #e0f2fe !important; color: #075985 !important; }
-
-    /* ③次々回 の見出し（黄系） */
-    .th-next2 { background: #fef9c3 !important; color: #854d0e !important; }
-
-    /* ④次々々回 の見出し（紫系） */
-    .th-next3 { background: #f3e8ff !important; color: #6b21a8 !important; }
-
-    /* =====================================================================
-      ▼▼▼ 在庫ステータスによる行の背景色 ▼▼▼
-      受注可能数が「マイナス」または「ゼロ」の行に自動で色がつきます。
-    ====================================================================== */
-    /* 受注可能数がマイナスの行（赤系） */
-    tr.stock-minus td { background: #fee2e2 !important; }
-
-    /* 受注可能数がゼロの行（黄色系） */
-    tr.stock-zero  td { background: #fef3c7 !important; }
-
-    /* ホバー時（マイナス行・ゼロ行） */
-    table#zaiko-table tbody tr.stock-minus:hover td { background: #fca5a5 !important; }
-    table#zaiko-table tbody tr.stock-zero:hover  td { background: #fde68a !important; }
-
-    /* =====================================================================
-      ▼▼▼ MAグループの区切り行のスタイル ▼▼▼
-      MA番号が変わるタイミングで自動挿入される灰色の帯行です。
-    ====================================================================== */
-    tr.ma-separator td {
-      background: #e2e8f0 !important; /* 区切り行の背景色 */
-      color: #1e293b;                 /* 区切り行の文字色 */
-      font-weight: bold;
-      font-size: 13px;
-      padding: 5px 12px;
-      letter-spacing: .05em;
-      border-bottom: 1px solid #cbd5e1;
-      text-align: left !important;
-    }
-
-    /* =====================================================================
-      ▼▼▼ 各列のセル配置・文字スタイル ▼▼▼
-      列の横揃え（左・右・中央）と文字色を設定します。
-    ====================================================================== */
-    /* 商品名列（左揃え・太字） */
-    .name-cell  { text-align: left !important; font-weight: bold; color: #1e293b; }
-
-    /* 数値列（右揃え） */
-    .num-cell   { text-align: right !important; font-variant-numeric: tabular-nums; }
-
-    /* 日付列（中央揃え） */
-    .date-cell  { text-align: center !important; color: #475569; }
-
-    /* 状態アイコン列（中央揃え・大きめフォント） */
-    .icon-cell  { text-align: center !important; font-size: 16px; }
-
-    /* =====================================================================
-      ▼▼▼ 状態アイコンの色（〇 △ ×） ▼▼▼
-      各アイコンの色を変更できます。
-    ====================================================================== */
-    .icon-ok    { color: #10b981; font-weight: bold; } /* 〇 の色（緑） */
-    .icon-warn  { color: #f59e0b; font-weight: bold; } /* × の色（オレンジ） */
-    .icon-ng    { color: #ef4444; font-weight: bold; } /* △ の色（赤） */
-
-    /* 入荷日が未定の場合に表示される「未定」テキストの色 */
-    .empty-date { color: #94a3b8; font-size: 11px; }
-
-    /* =====================================================================
-      ▼▼▼ 読み込み中オーバーレイ（ページ表示直後の白い画面） ▼▼▼
-    ====================================================================== */
-    #overlay {
-      position: fixed; inset: 0;
-      background: rgba(255,255,255,0.85); /* 半透明の白（0.85 = 85% の不透明度） */
-      backdrop-filter: blur(4px);         /* 背景のぼかし量 */
-      display: flex; align-items: center; justify-content: center;
-      z-index: 999;
-    }
-    #overlay-box {
-      background: #fff; border-radius: 12px;
-      padding: 40px 60px; text-align: center;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-      border: 1px solid #e2e8f0;
-    }
-    #overlay-box p { margin-top: 16px; color: #475569; font-size: 15px; font-weight: bold; }
-
-    /* くるくる回るスピナーアニメーション */
-    .spinner {
-      width: 48px; height: 48px;
-      border: 4px solid #e2e8f0;
-      border-top-color: #4A90E2; /* スピナーの色 */
-      border-radius: 50%;
-      animation: spin .8s linear infinite; /* .8s = 1回転の時間 */
-      margin: 0 auto;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* =====================================================================
-      ▼▼▼ スマートフォン・タブレット対応（追加） ▼▼▼
-      画面幅が768px以下（スマホ・タブレット）のときに適用される設定
-    ====================================================================== */
-    @media (max-width: 768px) {
-      /* ヘッダーのフォントを小さく */
-      #header { padding: 10px 12px; }
-      #header h1 { font-size: 14px; letter-spacing: 0; }
-      #header-right { gap: 10px; font-size: 11px; }
-      #timer-ring { width: 20px; height: 20px; }
-
-      /* テーブル外側の余白を狭く */
-      #wrapper { padding: 10px 4px; }
-
-      /* 検索窓をスマホサイズに調整 */
-      #zaiko-table_wrapper .dataTables_filter input {
-        width: 160px; font-size: 12px;
-      }
-
-      /* テーブルの最大高さをモバイル向けに調整 */
-      div.table-container { max-height: calc(100vh - 175px); }
-
-      /* テーブルのフォントサイズを小さく（横スクロールを減らすため） */
-      table#zaiko-table thead th,
-      table#zaiko-table tbody td { font-size: 11px; padding: 7px 6px; }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大川家具 国内オリジナル 在庫表</title>
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Meiryo","Yu Gothic","メイリオ",sans-serif;font-size:13px;background:#f4f7f9;color:#334155;overflow-y:scroll}
+#hd{background:#4A90E2;color:#fff;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 10px rgba(0,0,0,.1)}
+#hd h1{font-size:18px;font-weight:bold;letter-spacing:.05em;margin:0}
+#hr{display:flex;align-items:center;gap:20px;font-size:13px;color:#e0f2fe}
+#rt{display:flex;align-items:center;gap:6px}
+#tr{width:24px;height:24px;transform:rotate(-90deg)}
+#tt{fill:none;stroke:rgba(255,255,255,.3);stroke-width:3}
+#tf{fill:none;stroke:#fff;stroke-width:3;stroke-dasharray:57;stroke-dashoffset:0;transition:stroke-dashoffset 1s linear}
+#tl{font-size:12px;color:#fff;min-width:28px;text-align:right;font-weight:bold}
+#lu{font-size:12px;color:#e0f2fe}
+#wr{padding:16px 8px}
+.tc{display:flex;align-items:center;position:relative;margin-bottom:12px;width:100%}
+#zaiko-table_wrapper .dataTables_length{float:none;margin:0}
+#zaiko-table_wrapper .dataTables_filter{float:none;position:absolute;left:50%;transform:translateX(-50%);margin:0;text-align:center}
+#zaiko-table_wrapper .dataTables_filter input{border:1px solid #cbd5e1;border-radius:6px;padding:6px 12px;font-size:13px;width:260px;outline:none;transition:border-color .2s}
+#zaiko-table_wrapper .dataTables_filter input:focus{border-color:#4A90E2;box-shadow:0 0 0 2px rgba(74,144,226,.2)}
+#zaiko-table_wrapper .dataTables_filter label{font-size:13px;font-weight:bold;color:#475569}
+#zaiko-table_wrapper .dataTables_length select{border:1px solid #cbd5e1;border-radius:6px;padding:4px 8px;outline:none}
+#zaiko-table_wrapper .dataTables_info{font-size:13px;color:#64748b;margin-top:8px}
+div.dc{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 165px);background:#fff;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,.05)}
+div.dc table#zt thead{position:sticky;top:0;z-index:50}
+table#zt{table-layout:fixed;border-collapse:separate;border-spacing:0;margin:0;width:100%!important}
+table#zt thead th,table#zt tbody td{box-sizing:border-box;padding:9px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+table#zt thead th{font-size:12px;font-weight:bold;text-align:center!important;border-right:1px solid #e2e8f0;border-bottom:2px solid #cbd5e1;cursor:pointer}
+table#zt tbody td{border-right:1px solid #f1f5f9;border-bottom:1px solid #f1f5f9}
+table#zt thead th:last-child,table#zt tbody td:last-child{border-right:none}
+table#zt tbody tr:hover td{background:#f8fafc!important}
+table.dataTable thead th.sorting,table.dataTable thead th.sorting_asc,table.dataTable thead th.sorting_desc{padding-right:22px!important}
+.tb{background:#f8fafc!important;color:#334155!important}
+.tn{background:#dcfce7!important;color:#166534!important}
+.t1{background:#e0f2fe!important;color:#075985!important}
+.t2{background:#fef9c3!important;color:#854d0e!important}
+.t3{background:#f3e8ff!important;color:#6b21a8!important}
+tr.sm td{background:#fee2e2!important}
+tr.sz td{background:#fef3c7!important}
+table#zt tbody tr.sm:hover td{background:#fca5a5!important}
+table#zt tbody tr.sz:hover td{background:#fde68a!important}
+tr.ms td{background:#e2e8f0!important;color:#1e293b;font-weight:bold;font-size:13px;padding:5px 12px;letter-spacing:.05em;border-bottom:1px solid #cbd5e1;text-align:left!important}
+.nc{text-align:left!important;font-weight:600;color:#1e293b}
+.vc{text-align:right!important;color:#334155;font-variant-numeric:tabular-nums}
+.dc2{text-align:center!important;color:#475569;font-size:12px}
+.ic{text-align:center!important}
+.ok{color:#16a34a;font-size:16px;font-weight:bold}
+.ng{color:#d97706;font-size:15px}
+.wn{color:#ef4444;font-size:15px;font-weight:bold}
+.ed{color:#94a3b8}
+#ov{position:fixed;inset:0;background:rgba(255,255,255,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:16px}
+.sp{width:40px;height:40px;border:4px solid #e2e8f0;border-top-color:#4A90E2;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:768px){#hd{padding:10px 12px}#hd h1{font-size:14px;letter-spacing:0}#hr{gap:10px;font-size:11px}#tr{width:20px;height:20px}#wr{padding:10px 4px}#zaiko-table_wrapper .dataTables_filter input{width:160px;font-size:12px}div.dc{max-height:calc(100vh - 175px)}table#zt thead th,table#zt tbody td{font-size:11px;padding:7px 6px}}
+</style>
 </head>
 <body>
-
-<!-- 読み込み中オーバーレイ（データ読み込み完了後に自動で消える） -->
-<div id="overlay">
-  <div id="overlay-box">
-    <div class="spinner"></div>
-    <!-- 読み込み中に表示するメッセージ -->
-    <p>在庫データを読み込み中...</p>
-  </div>
-</div>
-
-<!-- =====================================================================
-  ▼▼▼ 上部の青いページヘッダー ▼▼▼
-  タイトルと自動更新タイマーが表示される固定バーです。
-====================================================================== -->
-<div id="header">
-  <!-- 左側：ページタイトル（自由に変更可） -->
+<div id="ov"><div class="sp"></div><p style="color:#64748b;font-size:14px">読み込み中...</p></div>
+<div id="hd">
   <h1>大川家具 国内オリジナル 在庫表</h1>
-
-  <!-- 右側：最終更新日時 + カウントダウンタイマー -->
-  <div id="header-right">
-    <span id="last-update"></span><!-- JavaScriptが自動で日時を挿入 -->
-    <div id="reload-timer">
-      <!-- SVGで描いた円形タイマー（変更不要） -->
-      <svg id="timer-ring" viewBox="0 0 20 20">
-        <circle id="timer-track" cx="10" cy="10" r="9"/>
-        <circle id="timer-fill"  cx="10" cy="10" r="9"/>
-      </svg>
-      <span id="timer-label">60s</span><!-- 残り秒数（JavaScriptが更新） -->
+  <div id="hr">
+    <span id="lu"></span>
+    <div id="rt">
+      <svg id="tr" viewBox="0 0 18 18"><circle id="tt" cx="9" cy="9" r="9"/><circle id="tf" cx="9" cy="9" r="9"/></svg>
+      <span id="tl">60s</span>
       <span>で自動更新</span>
     </div>
   </div>
 </div>
-
-<!-- =====================================================================
-  ▼▼▼ テーブル本体 ▼▼▼
-  <thead> の <th> タグが各列の見出しです。
-  ・表示テキストは <th> と </th> の間を編集
-  ・class="th-○○" で見出しの色グループを指定（CSSの .th-○○ と対応）
-  ・width は JavaScript 側の columns: の width で設定（こちらは変更不要）
-  ・title="○○" はマウスオーバー時のツールチップテキスト
-====================================================================== -->
-<div id="wrapper">
-  <table id="zaiko-table" class="display">
+<div id="wr">
+  <table id="zt" class="display">
     <thead>
       <tr>
-        <!-- 状態アイコン列（〇△×）→ th-base = 基本色 -->
-        <th class="th-base icon-cell" title="在庫状況">状態</th>
-
-        <!-- MAグループ番号列 -->
-        <th class="th-base num-cell">MA</th>
-
-        <!-- 商品名列 -->
-        <th class="th-base name-cell">商品名</th>
-
-        <!-- ①現在受注可能数 → th-now = 緑系 -->
-        <th class="th-now num-cell" title="現在受注可能数">①現在<br>受注可能数</th>
-
-        <!-- 次回入荷日・入荷数・受注可能数 → th-next1 = 青系 -->
-        <th class="th-next1 date-cell">次回<br>入荷日</th>
-        <th class="th-next1 num-cell">次回<br>入荷数</th>
-        <th class="th-next1 num-cell" title="次回受注可能数">②次回<br>受注可能数</th>
-
-        <!-- 次々回 → th-next2 = 黄系 -->
-        <th class="th-next2 date-cell">次々回<br>入荷日</th>
-        <th class="th-next2 num-cell">次々回<br>入荷数</th>
-        <th class="th-next2 num-cell" title="次々回受注可能数">③次々回<br>受注可能数</th>
-
-        <!-- 次々々回 → th-next3 = 紫系 -->
-        <th class="th-next3 date-cell">次々々回<br>入荷日</th>
-        <th class="th-next3 num-cell">次々々回<br>入荷数</th>
-        <th class="th-next3 num-cell" title="次々々回受注可能数">④次々々回<br>受注可能数</th>
+        <th class="tb ic"  title="在庫状況">状態</th>
+        <th class="tb vc">MA</th>
+        <th class="tb nc">商品名</th>
+        <th class="tn vc" title="現在受注可能数">①現在<br>受注可能数</th>
+        <th class="t1 dc2">次回<br>入荷日</th>
+        <th class="t1 vc">次回<br>入荷数</th>
+        <th class="t1 vc" title="次回受注可能数">②次回<br>受注可能数</th>
+        <th class="t2 dc2">次々回<br>入荷日</th>
+        <th class="t2 vc">次々回<br>入荷数</th>
+        <th class="t2 vc" title="次々回受注可能数">③次々回<br>受注可能数</th>
+        <th class="t3 dc2">次々々回<br>入荷日</th>
+        <th class="t3 vc">次々々回<br>入荷数</th>
+        <th class="t3 vc" title="次々々回受注可能数">④次々々回<br>受注可能数</th>
       </tr>
     </thead>
-    <tbody></tbody><!-- データ行はJavaScriptが自動で生成 -->
+    <tbody></tbody>
   </table>
 </div>
-
-<!-- =====================================================================
-  ▼▼▼ データファイルの読み込み（WordPress版） ▼▼▼
-  VBAが出力・アップロードした .js ファイルを読み込みます。
-  ・data_A = 松門担当、data_B = 大久保担当、data_C = 辻担当
-  ・このHTMLと同じディレクトリ（/wp-content/uploads/zaiko/）に配置
-  ・VBAの登録・入荷操作のたびに自動でサーバーへ上書きアップロードされる
-====================================================================== -->
-<script>
-  /* ファイルが存在しない場合に備えて空配列で初期化 */
-  var data_A = []; var data_B = []; var data_C = [];
-</script>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script>var _a=[],_b=[],_c=[];</script>
 <script src="data_A.js"></script>
 <script src="data_B.js"></script>
 <script src="data_C.js"></script>
-
 <script>
-/* ======================================================================
-  ▼▼▼ 自動更新の間隔（秒数） ▼▼▼
-  60 = 60秒ごとにページを再読み込み。30にすると30秒ごとに更新。
-====================================================================== */
-var RELOAD_SEC = 60;
-
-/* ページ読み込み完了後にテーブルを初期化 */
-document.addEventListener('DOMContentLoaded', function() {
-  initDashboard();
+(function(){
+var _R=60;
+var _K={n:'現在受注可能数',m:'MAグループ',p:'商品名',d1:'次回入荷日',q1:'次回入荷数量',n1:'次回受注可能数',d2:'次々回入荷日',q2:'次々回入荷数量',n2:'次々回受注可能数',d3:'次々々回入荷日',q3:'次々々回入荷数量',n3:'次々々回受注可能数'};
+function _fn(v){var n=parseInt(v);return isNaN(n)?'<span class="ed">―</span>':n+' 本';}
+function _fd(v){return(!v||v==='')?'<span class="ed">未定</span>':v;}
+function _f2(n){return String(n).padStart(2,'0');}
+var _d=(typeof data_A!=='undefined'?data_A:[]).concat(typeof data_B!=='undefined'?data_B:[],typeof data_C!=='undefined'?data_C:[]);
+var _s=sessionStorage.getItem('_s')||''
+var _w=_d.map(function(d){
+  var _v=parseInt(d[_K.n]||0),_i;
+  if(_v<=0)_i='<span class="wn">×</span>';
+  else if(_v<5)_i='<span class="ng">△</span>';
+  else _i='<span class="ok">○</span>';
+  return[_i,parseInt(d[_K.m]||0),d[_K.p]||'',_fn(d[_K.n]),_fd(d[_K.d1]),_fn(d[_K.q1]),_fn(d[_K.n1]),_fd(d[_K.d2]),_fn(d[_K.q2]),_fn(d[_K.n2]),_fd(d[_K.d3]),_fn(d[_K.q3]),_fn(d[_K.n3]),_v];
 });
-
-/* ======================================================================
-  ▼▼▼ テーブル初期化メイン処理 ▼▼▼
-====================================================================== */
-function initDashboard() {
-
-  /* 3名分のデータを1つの配列に結合 */
-  var allData = [].concat(data_A, data_B, data_C);
-
-  /* 各商品のデータをDataTables用の配列形式に変換 */
-  var rows = allData.map(function(d) {
-
-    /* 現在受注可能数を数値として取得（空の場合は0） */
-    var cur = parseInt(d['現在受注可能数'] || 0);
-
-    /* ====================================================================
-      ▼▼▼ 状態アイコンの表示条件 ▼▼▼
-      cur（現在受注可能数）の値によって表示するアイコンを切り替えます。
-        cur <= 0 のとき → × を表示（icon-warn クラス＝オレンジ色）
-        cur <  5 のとき → △ を表示（icon-ng   クラス＝赤色）
-        それ以外        → 〇 を表示（icon-ok   クラス＝緑色）
-      ▼ しきい値（5）を変えたい場合は "cur < 5" の数字を変更してください
-    ==================================================================== */
-    var icon;
-    if      (cur <= 0) icon = '<span class="icon-warn">\u00d7</span>'; /* × */
-    else if (cur <  5) icon = '<span class="icon-ng">\u25b3</span>';   /* △ */
-    else               icon = '<span class="icon-ok">\u25cb</span>';   /* 〇 */
-
-    /* ====================================================================
-      ▼▼▼ 各列のデータ配列 ▼▼▼
-      インデックス番号（0〜13）は後述の columns: の順番と対応しています。
-      この順番を変えると列の表示順も変わるため、基本的に変更不要です。
-    ==================================================================== */
-    return [
-      icon,                              // [0] 状態アイコン（〇△×）
-      parseInt(d['MAグループ'] || 0),    // [1] MAグループ番号（数値）
-      d['商品名'] || '',                 // [2] 商品名
-      fmtNum(d['現在受注可能数']),        // [3] ①現在受注可能数
-      fmtDate(d['次回入荷日']),          // [4] 次回入荷日
-      fmtNum(d['次回入荷数量']),          // [5] 次回入荷数量
-      fmtNum(d['次回受注可能数']),        // [6] ②次回受注可能数
-      fmtDate(d['次々回入荷日']),        // [7] 次々回入荷日
-      fmtNum(d['次々回入荷数量']),        // [8] 次々回入荷数量
-      fmtNum(d['次々回受注可能数']),      // [9] ③次々回受注可能数
-      fmtDate(d['次々々回入荷日']),      // [10] 次々々回入荷日
-      fmtNum(d['次々々回入荷数量']),      // [11] 次々々回入荷数量
-      fmtNum(d['次々々回受注可能数']),    // [12] ④次々々回受注可能数
-      cur                                // [13] 非表示（行の色判定に使用）
-    ];
-  });
-
-  /* ページ再読み込み後も検索キーワードを引き継ぐ（ブラウザの一時記憶） */
-  var savedSearch = sessionStorage.getItem('zaikoSearch') || '';
-
-  /* ====================================================================
-    ▼▼▼ DataTables の設定 ▼▼▼
-  ==================================================================== */
-  var dt = $('#zaiko-table').DataTable({
-
-    /* テーブルに表示するデータ（変更不要） */
-    data: rows,
-
-    /* ====================================================================
-      ▼▼▼ 各列の設定 ▼▼▼
-      width    = 列の横幅（px単位）。数値を変えると列幅が変わります。
-      orderable = true でクリックしてソートできる / false でソート不可
-      className = CSSクラス名（セルの配置・色などのスタイルを決める）
-        icon-cell  = アイコン列（中央揃え）
-        num-cell   = 数値列（右揃え）
-        name-cell  = 商品名列（左揃え・太字）
-        date-cell  = 日付列（中央揃え）
-    ==================================================================== */
-    columns: [
-      { orderable: true, searchable: false, className: 'icon-cell',  width:  '50px' }, // [0] 状態
-      { orderable: true, type: 'num',       className: 'num-cell',   width:  '60px' }, // [1] MA
-      { orderable: true,                    className: 'name-cell',  width: '300px' }, // [2] 商品名 ← 幅を広くしたい場合は変更
-      { orderable: true,                    className: 'num-cell',   width:  '90px' }, // [3] ①現在受注可能数
-      { orderable: true,                    className: 'date-cell',  width:  '90px' }, // [4] 次回入荷日
-      { orderable: true,                    className: 'num-cell',   width:  '80px' }, // [5] 次回入荷数
-      { orderable: true,                    className: 'num-cell',   width:  '90px' }, // [6] ②次回受注可能数
-      { orderable: true,                    className: 'date-cell',  width:  '90px' }, // [7] 次々回入荷日
-      { orderable: true,                    className: 'num-cell',   width:  '80px' }, // [8] 次々回入荷数
-      { orderable: true,                    className: 'num-cell',   width:  '90px' }, // [9] ③次々回受注可能数
-      { orderable: true,                    className: 'date-cell',  width:  '90px' }, // [10] 次々々回入荷日
-      { orderable: true,                    className: 'num-cell',   width:  '80px' }, // [11] 次々々回入荷数
-      { orderable: true,                    className: 'num-cell',   width: '100px' }, // [12] ④次々々回受注可能数
-      { visible: false }                                                               // [13] 非表示（行色判定用）
-    ],
-
-    /* ====================================================================
-      ▼▼▼ 初期ソート順 ▼▼▼
-      [[列番号, '方向']] の形式で指定します。
-        'asc'  = 昇順（小→大）
-        'desc' = 降順（大→小）
-      例）[[1, 'asc'], [2, 'asc']] = まずMA番号で昇順、同じMAは商品名で昇順
-    ==================================================================== */
-    order: [[1, 'asc'], [2, 'asc']],
-
-    /* ====================================================================
-      ▼▼▼ 1ページに表示する件数のデフォルト値 ▼▼▼
-      200 = 最初に200件表示。lengthMenu の選択肢から変更も可能。
-    ==================================================================== */
-    pageLength: 200,
-
-    /* ====================================================================
-      ▼▼▼ 件数セレクタの選択肢 ▼▼▼
-      -1 は「全件表示」を意味します。
-    ==================================================================== */
-    lengthMenu: [50, 100, 200, -1],
-
-    /* ページ再読み込み後に検索ワードを復元（変更不要） */
-    search: { search: savedSearch },
-
-    /* DataTablesのレイアウト構造（変更不要） */
-    dom: '<"top-controls"lf><"table-container"t>ip',
-
-    /* 列幅の自動計算を無効化（上の columns: の width を優先） */
-    autoWidth: false,
-
-    /* ====================================================================
-      ▼▼▼ 日本語テキストの設定 ▼▼▼
-      テーブル下部や検索窓の表示テキストを変更できます。
-    ==================================================================== */
-    language: {
-      search:            '商品名検索：',
-      searchPlaceholder: 'キーワードを入力...',
-      lengthMenu:        '_MENU_ 件表示',
-      info:              '_TOTAL_ 件中 _START_〜_END_ 件を表示',
-      infoFiltered:      '（_MAX_ 件から絞り込み）',
-      zeroRecords:       '該当商品が見つかりません',
-      emptyTable:        'データがありません',
-      paginate: { first: '先頭', last: '末尾', previous: '前', next: '次' }
-    },
-
-    /* ====================================================================
-      ▼▼▼ 行ごとの背景色（在庫ステータス） ▼▼▼
-      data[13] = 現在受注可能数の数値。これによって行の色クラスを決定。
-      クラス名は CSS の .stock-minus / .stock-zero と対応。
-    ==================================================================== */
-    createdRow: function(row, data) {
-      var cur = parseInt(data[13]);
-      if      (cur < 0)  $(row).addClass('stock-minus'); /* 赤系の背景 */
-      else if (cur === 0) $(row).addClass('stock-zero'); /* 黄色系の背景 */
-      /* cur > 0 の場合は何もしない（デフォルトの白背景） */
-    },
-
-    /* テーブルが描画されるたびにMAグループの区切り行を挿入 */
-    drawCallback: function() {
-      insertMASeparators(this.api());
-    }
-  });
-
-  /* 検索キーワードをブラウザの一時記憶に保存（再読み込み後に復元するため） */
-  $('#zaiko-table').on('search.dt', function() {
-    sessionStorage.setItem('zaikoSearch', dt.search());
-  });
-
-  /* ヘッダーの「最終更新」日時を現在時刻で更新 */
-  var now = new Date();
-  document.getElementById('last-update').textContent =
-    '最終更新: ' + fmt2(now.getMonth()+1) + '/' + fmt2(now.getDate()) +
-    ' ' + fmt2(now.getHours()) + ':' + fmt2(now.getMinutes()) + ':' + fmt2(now.getSeconds());
-
-  /* 読み込み完了 → オーバーレイを非表示 */
-  document.getElementById('overlay').style.display = 'none';
-
-  /* カウントダウンタイマーを開始 */
-  startCountdown();
-}
-
-/* ======================================================================
-  ▼▼▼ MAグループの区切り行を挿入する処理 ▼▼▼
-  MA列（[1]）で昇順ソートされているときだけ区切り行を表示します。
-  他の列でソートされている場合は区切り行を表示しません。
-====================================================================== */
-function insertMASeparators(api) {
-  var order = api.order();
-
-  /* 1列目（MA列）で昇順ソートされているか確認 */
-  var sortedByMA = order.length > 0 && order[0][0] === 1;
-  if (!sortedByMA) return; /* MA順でなければ何もしない */
-
-  var tbody = document.querySelector('#zaiko-table tbody');
-  var trs   = Array.from(tbody.querySelectorAll('tr:not(.ma-separator)'));
-
-  /* 既存の区切り行を一旦すべて削除 */
-  tbody.querySelectorAll('tr.ma-separator').forEach(function(r) { r.remove(); });
-
-  /* MA番号が変わるタイミングに区切り行を挿入 */
-  var prevMA = null;
-  trs.forEach(function(tr) {
-    var rowData = api.row(tr).data();
-    if (!rowData) return;
-    var ma = rowData[1]; /* data[1] = MAグループ番号 */
-
-    if (ma !== prevMA) {
-      /* 区切り行のHTML要素を作成 */
-      var sep = document.createElement('tr');
-      sep.className = 'ma-separator';
-      var td = document.createElement('td');
-      td.colSpan = 13; /* 表示列数（見出し列の数と合わせるところ） */
-      td.textContent = 'MA ' + (ma || '\u2015'); /* 「MA 〇〇〇」と表示 */
-      sep.appendChild(td);
-      tr.parentNode.insertBefore(sep, tr);
-      prevMA = ma;
+var _dt=$('#zt').DataTable({
+  data:_w,
+  columns:[
+    {orderable:true,searchable:false,className:'ic',width:'50px'},
+    {orderable:true,type:'num',className:'vc',width:'60px'},
+    {orderable:true,className:'nc',width:'300px'},
+    {orderable:true,className:'vc',width:'90px'},
+    {orderable:true,className:'dc2',width:'90px'},
+    {orderable:true,className:'vc',width:'80px'},
+    {orderable:true,className:'vc',width:'90px'},
+    {orderable:true,className:'dc2',width:'90px'},
+    {orderable:true,className:'vc',width:'80px'},
+    {orderable:true,className:'vc',width:'90px'},
+    {orderable:true,className:'dc2',width:'90px'},
+    {orderable:true,className:'vc',width:'80px'},
+    {orderable:true,className:'vc',width:'100px'},
+    {visible:false}
+  ],
+  order:[[1,'asc'],[2,'asc']],
+  pageLength:200,
+  lengthMenu:[50,100,200,-1],
+  search:{search:_s},
+  dom:'<"tc"lf><"dc"t>ip',
+  autoWidth:false,
+  language:{search:'商品名検索：',searchPlaceholder:'キーワードを入力...',lengthMenu:'_MENU_ 件表示',info:'_TOTAL_ 件中 _START_～_END_ 件を表示',infoFiltered:'（_MAX_ 件から絞り込み）',zeroRecords:'該当商品が見つかりません',emptyTable:'データがありません',paginate:{first:'先頭',last:'末尾',previous:'前',next:'次'}},
+  createdRow:function(row,data){var v=parseInt(data[13]);if(v<0)$(row).addClass('sm');else if(v===0)$(row).addClass('sz');},
+  drawCallback:function(){_sp(this.api());}
+});
+$('#zt').on('search.dt',function(){sessionStorage.setItem('_s',_dt.search());});
+var _now=new Date();
+document.getElementById('lu').textContent='最終更新: '+_f2(_now.getMonth()+1)+'/'+_f2(_now.getDate())+' '+_f2(_now.getHours())+':'+_f2(_now.getMinutes())+':'+_f2(_now.getSeconds());
+document.getElementById('ov').style.display='none';
+_cd();
+function _sp(api){
+  var _o=api.order();
+  if(!(_o.length>0&&_o[0][0]===1))return;
+  var _tb=document.querySelector('#zt tbody'),_tr=Array.from(_tb.querySelectorAll('tr:not(.ms)'));
+  _tb.querySelectorAll('tr.ms').forEach(function(r){r.remove();});
+  var _pm=null;
+  _tr.forEach(function(tr){
+    var _rd=api.row(tr).data();if(!_rd)return;
+    var _m=_rd[1];
+    if(_m!==_pm){
+      var _sp=document.createElement('tr'),_td=document.createElement('td');
+      _sp.className='ms';_td.colSpan=13;_td.textContent='MA '+(_m||'―');
+      _sp.appendChild(_td);tr.parentNode.insertBefore(_sp,tr);_pm=_m;
     }
   });
 }
-
-/* ======================================================================
-  ▼▼▼ カウントダウンタイマーのアニメーション処理 ▼▼▼
-  RELOAD_SEC（秒）でページを自動リロードします。
-  円形SVGの進行状況とテキストの残り秒数を1秒ごとに更新します。
-====================================================================== */
-function startCountdown() {
-  var CIRCUMFERENCE = 2 * Math.PI * 9; /* SVG円の円周（半径9 × 2π）*/
-  var fill  = document.getElementById('timer-fill');
-  var label = document.getElementById('timer-label');
-  var sec   = RELOAD_SEC;
-
-  fill.style.strokeDasharray  = CIRCUMFERENCE;
-  fill.style.strokeDashoffset = 0;
-
-  var interval = setInterval(function() {
-    sec--;
-    label.textContent = sec + 's';
-
-    /* 円弧の進行具合を更新（0=全部表示、CIRCUMFERENCE=全部消える） */
-    fill.style.strokeDashoffset = CIRCUMFERENCE * (1 - sec / RELOAD_SEC);
-
-    if (sec <= 0) {
-      clearInterval(interval); /* タイマーを停止 */
-      location.reload();       /* ページをリロード */
-    }
-  }, 1000); /* 1000ミリ秒 = 1秒ごとに実行 */
+function _cd(){
+  var _C=2*Math.PI*9,_fi=document.getElementById('tf'),_lb=document.getElementById('tl'),_sc=_R;
+  _fi.style.strokeDasharray=_C;_fi.style.strokeDashoffset=0;
+  var _iv=setInterval(function(){
+    _sc--;_lb.textContent=_sc+'s';
+    _fi.style.strokeDashoffset=_C*(1-_sc/_R);
+    if(_sc<=0){clearInterval(_iv);location.reload();}
+  },1000);
 }
-
-/* ======================================================================
-  ▼▼▼ ヘルパー関数（表示形式の整形） ▼▼▼
-====================================================================== */
-
-/* 数値を「○ 本」形式に変換。空・非数値の場合は「─」を表示 */
-function fmtNum(v) {
-  var n = parseInt(v);
-  if (isNaN(n)) return '<span class="empty-date">\u2015</span>'; /* ─ */
-  return n + ' 本';
-}
-
-/* 日付文字列をそのまま表示。空の場合は「未定」を表示 */
-function fmtDate(v) {
-  if (!v || v === '') return '<span class="empty-date">未定</span>';
-  return v;
-}
-
-/* 数値を2桁ゼロ埋めする（例：9 → "09"）*/
-function fmt2(n) { return String(n).padStart(2, '0'); }
+})();
 </script>
 </body>
 </html>
